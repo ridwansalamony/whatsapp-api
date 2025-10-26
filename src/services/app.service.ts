@@ -1,22 +1,32 @@
 import { getClient } from "../applications/app";
-import { TSendMessages } from "../controllers/app.controller";
+import { sanitizeNumber, buildJid } from "../utils/helper";
+
+export type TSendMessages = {
+  to: string;
+  message: string;
+};
+
+const sendMessage = async (payload: TSendMessages, type: "personal" | "group") => {
+  const to = sanitizeNumber(payload.to);
+  const jid = buildJid(to, type);
+  const client = getClient();
+
+  return await client.sendMessage(jid, payload.message);
+};
 
 export default {
-  async send(payload: TSendMessages) {
-    // simple sanitize: hapus spasi, tanda plus
-    const to = payload.to.replace(/\D/g, ""); // hanya digit
-    const jid = `${to}@c.us`;
+  async sendPersonal(payload: TSendMessages) {
+    return sendMessage(payload, "personal");
+  },
 
+  async sendGroup(payload: TSendMessages) {
+    return sendMessage(payload, "group");
+  },
+
+  async getGroups() {
     const client = getClient();
+    const chats = await client.getChats();
 
-    try {
-      const result = await client.sendMessage(jid, payload.message);
-
-      return result;
-    } catch (err) {
-      console.error("Service send error:", err);
-      // lempar error agar controller bisa menampilkannya
-      throw err;
-    }
+    return chats.filter((chat: any) => chat.isGroup).map((g: any) => ({ id: g.id._serialized, name: g.name }));
   },
 };

@@ -1,24 +1,31 @@
-import type { Request, Response, NextFunction } from "express";
+import type { Request, Response } from "express";
 import appService from "../services/app.service";
+import { success, error } from "../utils/response";
 
-export type TSendMessages = {
-  to: string;
-  message: string;
+// Wrapper async agar tak perlu try/catch di tiap route
+const asyncHandler = (fn: any) => (req: Request, res: Response, next: any) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
 };
 
 export default {
-  async send(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { to, message }: TSendMessages = req.body;
+  sendPersonal: asyncHandler(async (req: Request, res: Response) => {
+    const { to, message } = req.body;
+    if (!to || !message) return error(res, "Missing 'to' or 'message'", undefined, 400);
 
-      if (!to || !message) return res.status(400).json({ error: "Missing to or message" });
-      const response = await appService.send({ to, message });
+    const response = await appService.sendPersonal({ to, message });
+    return success(res, { to, message, response });
+  }),
 
-      res.status(200).json({ success: true, to, message, response });
-    } catch (error) {
-      console.error("Send controller error:", error);
-      // Kirim detail error untuk debugging (di production sebaiknya ringkas)
-      return res.status(500).json({ error: "Failed to send message", detail: (error as Error).message });
-    }
-  },
+  sendGroup: asyncHandler(async (req: Request, res: Response) => {
+    const { to, message } = req.body;
+    if (!to || !message) return error(res, "Missing 'to' or 'message'", undefined, 400);
+
+    const response = await appService.sendGroup({ to, message });
+    return success(res, { to, message, response });
+  }),
+
+  getGroups: asyncHandler(async (_req: Request, res: Response) => {
+    const response = await appService.getGroups();
+    return success(res, response);
+  }),
 };
