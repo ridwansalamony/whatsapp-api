@@ -13,10 +13,18 @@ let pool: Pool | null = null;
 
 export const getPool = (): Pool => {
   if (!pool) {
+    const shouldUseSsl =
+      PGSSL ||
+      (DATABASE_URL
+        ? DATABASE_URL.includes("supabase") ||
+          DATABASE_URL.includes("sslmode=require") ||
+          DATABASE_URL.includes("ssl=true")
+        : false);
+
     const config: PoolConfig = DATABASE_URL
       ? {
           connectionString: DATABASE_URL,
-          ssl: PGSSL ? { rejectUnauthorized: false } : false,
+          ssl: shouldUseSsl ? { rejectUnauthorized: false } : false,
         }
       : {
           host: PGHOST,
