@@ -1,0 +1,46 @@
+version: "3.8"
+
+services:
+  # Database PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: whatsapp_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${PGUSER:-postgres}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-postgrespassword}
+      POSTGRES_DB: ${PGDATABASE:-whatsapp_api}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER:-postgres} -d ${PGDATABASE:-whatsapp_api}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # WhatsApp API Gateway Service
+  whatsapp-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whatsapp_api
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${PGUSER:-postgres}:${PGPASSWORD:-postgrespassword}@postgres:5432/${PGDATABASE:-whatsapp_api}
+      SESSION_NAME: ${SESSION_NAME:-whatsapp_session_vps}
+      API_KEY: ${API_KEY:-}
+    # Shm size recommended for Chromium headless in container
+    shm_size: "1gb"
+
+volumes:
+  pgdata:
+    driver: local

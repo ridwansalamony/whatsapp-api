@@ -1,25 +1,18 @@
-import express from "express";
-import type { Router } from "express";
+import express, { Router } from "express";
 import appController from "../controllers/app.controller";
+import { apiKeyAuth } from "../middlewares/auth.middleware";
 
 const router: Router = express.Router();
 
-/**
- * @route   GET /api/whatsapp/groups
- * @desc    Get all WhatsApp groups
- */
-router.get("/whatsapp/groups", appController.getGroups);
+// Public routes for monitoring & linking
+router.get("/status", appController.status);
+router.get("/qr", appController.qrView);
 
-/**
- * @route   POST /api/whatsapp/send-personal
- * @desc    Send personal message to specific user
- */
-router.post("/whatsapp/send-personal", appController.sendPersonal);
-
-/**
- * @route   POST /api/whatsapp/send-group
- * @desc    Send message to WhatsApp group
- */
-router.post("/whatsapp/send-group", appController.sendGroup);
+// Protected routes (require API_KEY if configured in .env)
+router.post("/send-message", apiKeyAuth, appController.send);
+router.get("/whatsapp/groups", apiKeyAuth, appController.getGroups);
+router.post("/whatsapp/send-personal", apiKeyAuth, appController.sendPersonal);
+router.post("/whatsapp/send-group", apiKeyAuth, appController.sendGroup);
+router.get("/logs", apiKeyAuth, appController.logs);
 
 export default router;
