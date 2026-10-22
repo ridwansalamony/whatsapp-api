@@ -87,7 +87,7 @@ export const setupWhatsapp = async (): Promise<Client> => {
       const client = new Client({
         authStrategy: new RemoteAuth({
           store,
-          backupSyncIntervalMs: 300000, // 5 menit sinkronisasi
+          backupSyncIntervalMs: 60000, // 1 menit sinkronisasi (minimum yang diizinkan)
           clientId: SESSION_NAME || "default",
         }),
         puppeteer: {
@@ -123,6 +123,12 @@ export const setupWhatsapp = async (): Promise<Client> => {
         state.qrRaw = null;
         state.qrDataUrl = null;
         console.log("🔐 WhatsApp Client terautentikasi!");
+      });
+
+      // Event: Remote Session Saved (dipanggil setelah sesi berhasil disimpan ke DB)
+      client.on("remote_session_saved", () => {
+        console.log("\n✅ [SESSION] Sesi WhatsApp berhasil disimpan ke PostgreSQL/Supabase!");
+        console.log("✅ [SESSION] Restart aplikasi tidak akan membutuhkan scan ulang QR.\n");
       });
 
       // Event: Ready
@@ -178,6 +184,16 @@ export const destroyWhatsapp = async (): Promise<void> => {
   if (clientInstance) {
     console.log("🛑 Mematikan WhatsApp Client...");
     try {
+      // Force save session ke database sebelum destroy
+      // Ini KRUSIAL: client.destroy() sendiri tidak menyimpan sesi!
+      const authStrategy = (clientInstance as any).authStrategy;
+      if (authStrategy && typeof authStrategy.storeRemoteSession === "function" && state.status === "READY") {
+        console.log("💾 [SESSION] Menyimpan sesi WhatsApp ke database sebelum shutdown...");
+        await authStrategy.storeRemoteSession().catch((e: Error) => {
+          console.error("⚠️ [SESSION] Gagal menyimpan sesi saat shutdown:", e.message);
+        });
+        console.log("✅ [SESSION] Sesi berhasil disimpan ke database.");
+      }
       await clientInstance.destroy();
     } catch (e) {
       console.error("Error destroying WhatsApp client:", e);
