@@ -78,10 +78,6 @@ export default {
     }
   },
 
-  async sendPersonal(payload: SendMessagePayload) {
-    return this.send(payload);
-  },
-
   async sendGroup(payload: SendMessagePayload) {
     let to = payload.to;
     if (!to.endsWith("@g.us")) {

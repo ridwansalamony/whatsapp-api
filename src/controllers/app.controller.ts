@@ -41,27 +41,6 @@ export default {
   },
 
   /**
-   * Endpoint: POST /api/whatsapp/send-personal
-   * Send personal message
-   */
-  async sendPersonal(req: Request, res: Response): Promise<void> {
-    try {
-      const { to, message } = req.body;
-
-      if (!to || !message) {
-        error(res, "Missing 'to' or 'message'", undefined, 400);
-        return;
-      }
-
-      const response = await appService.sendPersonal({ to, message });
-      success(res, { to, message, response }, 200);
-    } catch (err: any) {
-      console.error("[AppController] sendPersonal error:", err.message);
-      error(res, err.message || "Failed to send personal message", undefined, 500);
-    }
-  },
-
-  /**
    * Endpoint: POST /api/whatsapp/send-group
    * Send group message
    */
