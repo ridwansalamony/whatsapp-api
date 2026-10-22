@@ -251,3 +251,12 @@ pm2 startup
     ]
   }
   ```
+
+
+## Retensi log pesan
+
+Gateway menyimpan metadata pengiriman: penerima, status, ID pesan, hash SHA-256, dan jumlah byte. Isi pesan tidak disalin ke database; kolom message pada API logs tetap ada dengan string kosong. Hash membantu mencocokkan pesan tanpa menyimpan teksnya.
+
+Log SUCCESS disimpan tujuh hari, log gagal 30 hari, dengan target maksimal 5.000 baris. Pembersihan berjalan saat startup dan setiap lima menit, maksimal 5.000 baris per operasi. Dua replika menggunakan lock database agar pembersihan tidak bertabrakan. Log lama dibersihkan bertahap; sesi autentikasi whatsapp_sessions tidak disentuh. Jika database dibagi dengan Dinute Store, pemeliharaan toko juga dapat membersihkan message_logs.
+
+Restart gateway setelah pembaruan agar kolom metadata dan timer terpasang. Tidak ada pesan WhatsApp yang dikirim oleh job pembersihan. Jalankan npm run test:retention untuk pengujian metadata dan transaksi pembersihan menggunakan mock, tanpa koneksi WhatsApp.

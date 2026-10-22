@@ -17,7 +17,8 @@
   "scripts": {
     "dev": "nodemon src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test:retention": "npm run build && node --test tests/message-log-retention.test.cjs"
   },
   "dependencies": {
     "cors": "^2.8.5",

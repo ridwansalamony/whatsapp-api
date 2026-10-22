@@ -1,6 +1,7 @@
 import { getClient } from "../applications/app";
 import { getPool } from "../applications/database";
 import { formatToWhatsAppJid } from "../utils/phone.util";
+import { createHash } from 'node:crypto';
 
 export interface SendMessagePayload {
   to: string;
@@ -31,18 +32,21 @@ export default {
 
     const client = getClient();
     const pool = getPool();
+    const text = message.trim();
+    const hash = createHash('sha256').update(text).digest('hex');
+    const bytes = Buffer.byteLength(text, 'utf8');
 
     try {
       // 2. Kirim pesan via WhatsApp Web Client
-      const result = await client.sendMessage(phoneInfo.jid, message.trim());
+      const result = await client.sendMessage(phoneInfo.jid, text);
       const messageId = result.id?.id || "unknown";
 
       // 3. Catat history ke PostgreSQL (asynchronous, non-blocking)
       pool
         .query(
-          `INSERT INTO message_logs (recipient, message, status, whatsapp_message_id)
-           VALUES ($1, $2, $3, $4)`,
-          [phoneInfo.formattedNumber, message, "SUCCESS", messageId]
+          `INSERT INTO message_logs (recipient, message, status, whatsapp_message_id, message_sha256, message_bytes)
+           VALUES ($1, '', $2, $3, $4, $5)`,
+          [phoneInfo.formattedNumber, "SUCCESS", messageId, hash, bytes]
         )
         .catch((dbErr) => {
           console.error("Gagal mencatat log pesan ke PostgreSQL:", dbErr.message);
@@ -61,9 +65,9 @@ export default {
       // Catat kegagalan ke database
       pool
         .query(
-          `INSERT INTO message_logs (recipient, message, status, error_message)
-           VALUES ($1, $2, $3, $4)`,
-          [phoneInfo.formattedNumber || to, message, "FAILED", err.message]
+          `INSERT INTO message_logs (recipient, message, status, error_message, message_sha256, message_bytes)
+           VALUES ($1, '', $2, $3, $4, $5)`,
+          [phoneInfo.formattedNumber || to, "FAILED", 'whatsapp_send_failed', hash, bytes]
         )
         .catch((dbErr) => {
           console.error("Gagal mencatat log kegagalan ke PostgreSQL:", dbErr.message);
@@ -101,7 +105,7 @@ export default {
     const pool = getPool();
     const safeLimit = Math.min(Math.max(1, limit), 100);
     const result = await pool.query(
-      `SELECT id, recipient, message, status, whatsapp_message_id, error_message, created_at
+      `SELECT id, recipient, message, status, whatsapp_message_id, error_message, created_at, message_sha256, message_bytes
        FROM message_logs
        ORDER BY created_at DESC
        LIMIT $1`,

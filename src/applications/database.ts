@@ -1,4 +1,5 @@
 import { Pool, PoolConfig } from "pg";
+import { pruneMessageLogs } from '../services/message-log-retention';
 import {
   DATABASE_URL,
   PGHOST,
@@ -10,6 +11,15 @@ import {
 } from "../utils/env";
 
 let pool: Pool | null = null;
+let retentionTimer: ReturnType<typeof setInterval> | null = null;
+let retentionRunning = false;
+async function maintainMessageLogs() {
+  if (retentionRunning) return;
+  retentionRunning = true;
+  try { await pruneMessageLogs(getPool()); }
+  catch { console.error('Pembersihan riwayat WhatsApp tertunda.'); }
+  finally { retentionRunning = false; }
+}
 
 export const getPool = (): Pool => {
   if (!pool) {
@@ -85,13 +95,23 @@ export const initDatabase = async (): Promise<void> => {
       ON message_logs(created_at DESC);
     `);
 
+    await client.query(`ALTER TABLE message_logs
+      ADD COLUMN IF NOT EXISTS message_sha256 VARCHAR(64),
+      ADD COLUMN IF NOT EXISTS message_bytes INTEGER`);
+
     console.log("✅ PostgreSQL siap dan tabel terverifikasi!");
   } finally {
     client.release();
   }
+  await maintainMessageLogs();
+  if (!retentionTimer) {
+    retentionTimer = setInterval(() => { void maintainMessageLogs(); }, 5 * 60 * 1000);
+    retentionTimer.unref();
+  }
 };
 
 export const closeDatabase = async (): Promise<void> => {
+  if (retentionTimer) { clearInterval(retentionTimer); retentionTimer = null; }
   if (pool) {
     console.log("🐘 Menutup pool koneksi PostgreSQL...");
     await pool.end();
